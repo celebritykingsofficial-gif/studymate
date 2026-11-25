@@ -1,0 +1,5 @@
+[functions.analyze-papers]
+verify_jwt = true
+
+[functions.generate-notes]
+verify_jwt = true

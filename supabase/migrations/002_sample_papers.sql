@@ -1,0 +1,15 @@
+create table public.paper_creators(user_id uuid primary key references auth.users on delete cascade);
+alter table public.paper_creators enable row level security;
+revoke all on public.paper_creators from public, anon, authenticated;
+grant select on public.paper_creators to authenticated;
+create policy own_role on public.paper_creators for select to authenticated using(user_id=auth.uid());
+create table public.sample_papers(id uuid primary key, subject text not null, code text not null, exam_date date not null, marks integer not null check(marks>0), pages text[] not null check(cardinality(pages)>0));
+alter table public.sample_papers enable row level security;
+grant select,insert,update on public.sample_papers to authenticated;
+create policy read_samples on public.sample_papers for select to authenticated using(true);
+create policy publish_samples on public.sample_papers for insert to authenticated with check(exists(select from public.paper_creators));
+create policy edit_samples on public.sample_papers for update to authenticated using(exists(select from public.paper_creators)) with check(exists(select from public.paper_creators));
+insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types) values('sample-pages','sample-pages',false,10485760,array['image/jpeg','image/png','image/webp']);
+create policy view_pages on storage.objects for select to authenticated using(bucket_id='sample-pages' and (exists(select from public.paper_creators) or exists(select from public.sample_papers p where storage.objects.name=any(p.pages))));
+create policy add_pages on storage.objects for insert to authenticated with check(bucket_id='sample-pages' and exists(select from public.paper_creators));
+create policy clean_pages on storage.objects for delete to authenticated using(bucket_id='sample-pages' and exists(select from public.paper_creators));
